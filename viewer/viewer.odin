@@ -14,18 +14,6 @@ wrap_int :: proc(x, count: int) -> int {
 	return out + count if out < 0 else out
 }
 
-add :: proc(x, y: int) -> int {
-	return x + y
-}
-
-mult :: proc(x, y: int) -> int {
-	return x * y
-}
-
-divide :: proc(x, y: int) -> int {
-	return x / y
-}
-
 draw_text :: proc (text: string, loc: rl.Vector2, glyphs: ^[dynamic]parser.glyph_info, size: int=32, width: f32 = 1.0) -> f32{
 	scale := cast(f32)size / 32.0
 	origin := loc
@@ -162,6 +150,10 @@ main :: proc() {
 			text = "(2+2)*3=12"
 			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
 			text = "{email: lastname.firstname@mailbox.com}"
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			text = "All your bases are now belong to us"
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			text = "All work and no play makes Jack a dull boy"
 			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
 		}
 
