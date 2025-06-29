@@ -1,27 +1,8 @@
-package hershey_parser
+package common
 
-INVALID_COORD :: -127
+INVALID_COORD :: min(i8)
 BASELINE :: -9
 
-is_digit :: proc(c: u8) -> bool {
-	return '0' <= c && c <= '9'
-}
-
-is_white_space :: proc(c: u8) -> bool {
-	switch c {
-	case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0:
-		return true
-	}
-	return false
-}
-
-is_line_break :: proc(c: u8) -> bool {
-	switch c {
-	case '\n', '\v', '\f', '\r', 0x85:
-		return true
-	}
-	return false
-}
 
 
 glyph_info :: struct {
