@@ -3,8 +3,6 @@ package common
 INVALID_COORD :: min(i8)
 BASELINE :: -9
 
-
-
 glyph_info :: struct {
 	idx:          u16,
 	advance:      i8,

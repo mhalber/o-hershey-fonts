@@ -1,6 +1,7 @@
 package common
 
 import "core:fmt"
+import rl "vendor:raylib"
 
 // Basic
 is_digit :: proc(c: u8) -> bool {
@@ -26,4 +27,9 @@ is_line_break :: proc(c: u8) -> bool {
 // Logging helpers
 log_if_verbose :: proc(verbose: bool, args: ..any) {
 	if verbose do fmt.println(..args)
+}
+
+get_font_pixel_size :: proc(font_size_in_points: int) -> f32 {
+    dpi_scale := rl.GetWindowScaleDPI().x // Assuming DPI scale is uniform across x and y axis
+    return (dpi_scale * (cast(f32)font_size_in_points * (96.0 / 72.0))) // 72 points per inch squared
 }

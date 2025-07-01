@@ -1,6 +1,6 @@
 package hershey_converter
 
-import parser "../common"
+import utils "../common"
 import "core:flags"
 import "core:fmt"
 import "core:os"
@@ -9,29 +9,6 @@ import "core:mem"
 
 OutputType :: enum {OdinCode, Binary}
 
-log_if_verbose :: proc(verbose: bool, args: ..any) {
-	if verbose do fmt.println(..args)
-}
-
-binary_file_write_i32 :: proc(file: os.Handle, value: i32) {
-	value_bytes := [4]u8{
-		u8(value & 0xFF),
-		u8((value >> 8) & 0xFF),
-		u8((value >> 16) & 0xFF),
-		u8((value >> 24) & 0xFF),
-	}
-	os.write(file, value_bytes[:])
-}
-
-binary_file_write_u32 :: proc(file: os.Handle, value: u32) {
-	value_bytes := [4]u8{
-		u8(value & 0xFF),
-		u8((value >> 8) & 0xFF),
-		u8((value >> 16) & 0xFF),
-		u8((value >> 24) & 0xFF),
-	}
-	os.write(file, value_bytes[:])
-}
 
 main :: proc() {
 	// TODO: maciej - step through this. How does it even work??
@@ -61,8 +38,8 @@ main :: proc() {
 	}
 
 	// Parse the jhf data
-	hershey_glyphs: [dynamic]parser.glyph_info = {}
-	parser.parse_jhf(jhf_data = data, glyphs = &hershey_glyphs)
+	hershey_glyphs: [dynamic]utils.glyph_info = {}
+	utils.parse_jhf(jhf_data = data, glyphs = &hershey_glyphs)
 
 	if opts.output_type == OutputType.OdinCode {
 	    fmt.println("Writing Odin code output")
@@ -106,71 +83,54 @@ main :: proc() {
     		}
     	}
     	fmt.fprintln(opts.output_file, "\n}")
-    	log_if_verbose(opts.verbose, "Done")
+    	utils.log_if_verbose(opts.verbose, "Done")
 	} else if opts.output_type == OutputType.Binary {
-	    log_if_verbose(opts.verbose, "Writing binary output")
+	    utils.log_if_verbose(opts.verbose, "Writing binary output")
 		// Calculate the total size required for the binary file
-		// Header: glyph count (4 bytes) + offsets (4 bytes per glyph)
+		// Info: glyph count (4 bytes) + offsets (4 bytes per glyph)
 		// Data: For each glyph: advance (1 byte) + coords_count (1 byte) + coords (coords_count * 2 bytes)
-		glyph_count := len(hershey_glyphs)
-		header_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
+		glyph_count :i32= cast(i32)len(hershey_glyphs)
+		info_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
 
 		// Calculate offsets and total size
 		offsets := make([]u32, glyph_count)
-		current_offset := u32(header_size)
+		current_offset := u32(info_size)
 
 		for glyph, i in hershey_glyphs {
 			offsets[i] = current_offset
-			// Size for this glyph: advance (1) + coords_count (1) + coords (coords_count * 2)
-			current_offset += u32(2 + glyph.coords_count * 2)
+			// Size for this glyph: advance (1) + coords_count (2) + coords (coords_count * 2)
+			current_offset += u32(3 + glyph.coords_count * 2)
 		}
 
 		total_size := current_offset
 
-
-		log_if_verbose(opts.verbose, "Binary file structure:")
-		log_if_verbose(opts.verbose, "Header size:", header_size, "bytes")
-		log_if_verbose(opts.verbose, "Total file size:", total_size, "bytes")
+		utils.log_if_verbose(opts.verbose, "Binary file structure:")
+		utils.log_if_verbose(opts.verbose, "Header size:", info_size, "bytes")
+		utils.log_if_verbose(opts.verbose, "Total file size:", total_size, "bytes")
 
 		// Write the header
 		// First 4 bytes: glyph count
-		count_bytes := [4]u8{
-			u8(glyph_count & 0xFF),
-			u8((glyph_count >> 8) & 0xFF),
-			u8((glyph_count >> 16) & 0xFF),
-			u8((glyph_count >> 24) & 0xFF),
-		}
-		os.write(opts.output_file, count_bytes[:])
-		// TODO(maciej): Test which one works correctly, or if both do
 		os.write(opts.output_file, mem.any_to_bytes(glyph_count))
 
 		// Write offsets (4 bytes each)
-		for offset in offsets {
-			offset_bytes := [4]u8{
-				u8(offset & 0xFF),
-				u8((offset >> 8) & 0xFF),
-				u8((offset >> 16) & 0xFF),
-				u8((offset >> 24) & 0xFF),
-			}
-			os.write(opts.output_file, offset_bytes[:])
+		for offset, i in offsets {
+		    offset_bytes := mem.any_to_bytes(offset)
+			fmt.println(i, offset, offset_bytes)
+			os.write(opts.output_file, offset_bytes)
 		}
 
 		// Write the glyph data
 		for glyph in hershey_glyphs {
 			// Write advance (1 byte)
 			advance_byte := [1]u8{u8(glyph.advance)}
-			os.write(opts.output_file, advance_byte[:])
-
-			// Write coords_count (1 byte)
-			coords_count_byte := [1]u8{u8(glyph.coords_count)}
-			os.write(opts.output_file, coords_count_byte[:])
+			os.write(opts.output_file, mem.any_to_bytes(glyph.advance))
+			// Write coords_count (2 byte)
+			os.write(opts.output_file, mem.any_to_bytes(glyph.coords_count))
 
 			// Write coordinates (coords_count * 2 bytes)
 			for j in 0..<glyph.coords_count {
-				x_byte := [1]u8{u8(glyph.coords[2 * j])}
-				y_byte := [1]u8{u8(glyph.coords[2 * j + 1])}
-				os.write(opts.output_file, x_byte[:])
-				os.write(opts.output_file, y_byte[:])
+				coords := [2]u8{u8(glyph.coords[2 * j]), u8(glyph.coords[2 * j + 1])}
+				os.write(opts.output_file, coords[:])
 			}
 		}
 

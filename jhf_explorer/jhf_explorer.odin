@@ -7,7 +7,7 @@ import "core:path/filepath"
 import "core:strings"
 
 import rl "vendor:raylib"
-import parser "../common"
+import utils "../common"
 
 ViewMode :: enum {GLYPH, TEXT}
 
@@ -16,22 +16,27 @@ wrap_int :: proc(x, count: int) -> int {
 	return out + count if out < 0 else out
 }
 
-draw_text :: proc (text: string, loc: rl.Vector2, glyphs: ^[dynamic]parser.glyph_info, size: int=32, width: f32 = 1.0) -> f32{
-	scale := cast(f32)size / 32.0
+draw_text :: proc (text: string,
+                   loc: rl.Vector2,
+                   glyphs: ^[dynamic]utils.glyph_info,
+                   size: int=18,
+                   width: f32 = 1.0) -> f32{
+    font_size_in_pixels := utils.get_font_pixel_size(size)
+	scale := cast(f32)font_size_in_pixels / 32.0
 	origin := loc
 	newline_count := 1
 	for c in text {
-		newline_count += cast(int)parser.is_line_break(cast(u8)c)
+		newline_count += cast(int)utils.is_line_break(cast(u8)c)
 		cur_glyph_idx := cast(u8)c - 32
 		cur_glyph := glyphs[cur_glyph_idx]
 
 		glyph := glyphs[cur_glyph_idx]
-		px: i8 = parser.INVALID_COORD
-		py: i8 = parser.INVALID_COORD
+		px: i8 = utils.INVALID_COORD
+		py: i8 = utils.INVALID_COORD
 		for i: i16 = 0; i < glyph.coords_count; i += 1 {
 			cx := glyph.coords[i * 2]
 			cy := glyph.coords[i * 2 + 1]
-			if (px != parser.INVALID_COORD && cx != parser.INVALID_COORD) {
+			if (px != utils.INVALID_COORD && cx != utils.INVALID_COORD) {
 				p0 := rl.Vector2{cast(f32)px, cast(f32)py}
 				p1 := rl.Vector2{cast(f32)cx, cast(f32)cy}
 				rl.DrawLineEx(origin + scale * p0, origin + scale * p1, width, rl.BLACK)
@@ -57,8 +62,8 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	hershey_glyphs: [dynamic]parser.glyph_info = {}
-	parser.parse_jhf(jhf_data=data, glyphs = &hershey_glyphs)
+	hershey_glyphs: [dynamic]utils.glyph_info = {}
+	utils.parse_jhf(jhf_data=data, glyphs = &hershey_glyphs)
 
 	screen_width, screen_height: i32 = 1024, 1024
 	rl.SetTraceLogLevel(rl.TraceLogLevel.NONE)
@@ -90,14 +95,14 @@ main :: proc() {
 
 			// Draw glyph
 			glyph := hershey_glyphs[glyph_idx]
-			px: i8 = parser.INVALID_COORD
-			py: i8 = parser.INVALID_COORD
+			px: i8 = utils.INVALID_COORD
+			py: i8 = utils.INVALID_COORD
 			for i: i16 = 0; i < glyph.coords_count; i += 1 {
 				cx := glyph.coords[i * 2]
 				cy := glyph.coords[i * 2 + 1]
-				if (px != parser.INVALID_COORD && cx != parser.INVALID_COORD) {
-					p0 := rl.Vector2{cast(f32)(px + glyph.left), cast(f32)(py + parser.BASELINE)}
-					p1 := rl.Vector2{cast(f32)(cx + glyph.left), cast(f32)(cy + parser.BASELINE)}
+				if (px != utils.INVALID_COORD && cx != utils.INVALID_COORD) {
+					p0 := rl.Vector2{cast(f32)(px + glyph.left), cast(f32)(py + utils.BASELINE)}
+					p1 := rl.Vector2{cast(f32)(cx + glyph.left), cast(f32)(cy + utils.BASELINE)}
 					rl.DrawLineEx(origin + scale * p0, origin + scale * p1, 4.0, rl.BLACK)
 				}
 				px = cx
@@ -133,8 +138,8 @@ main :: proc() {
 			rl.DrawLineEx(origin + scale * bbox_d, origin + scale * bbox_a, 1.0, rl.RED)
 
 			// Draw baselines
-			baseline_a := rl.Vector2{-16, -parser.BASELINE}
-			baseline_b := rl.Vector2{16, -parser.BASELINE}
+			baseline_a := rl.Vector2{-16, -utils.BASELINE}
+			baseline_b := rl.Vector2{16, -utils.BASELINE}
 			rl.DrawLineEx(origin + scale * baseline_a, origin + scale * baseline_b, 1.0, rl.MAROON)
 
 			// Draw left and right verticals
@@ -147,21 +152,21 @@ main :: proc() {
 		} else {
 		    // Draw some text
 			text := "a quick brown fox jumps over a lazy dog"
-			y_offset := draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset := draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "A QUICK BROWN FOX JUMPS OVER A LAZY DOG"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "Sphinx of black quartz, judge my vow"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "0, 1, 2, 3, 4, 5, 6, 7, 8, 9"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "(2+2)*3=12"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "{email: lastname.firstname@mailbox.com}"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "All your bases are now belong to us"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 			text = "All work and no play makes Jack a dull boy"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=32, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
 		}
 
 		rl.EndDrawing()
