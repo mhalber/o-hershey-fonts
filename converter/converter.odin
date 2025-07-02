@@ -9,7 +9,6 @@ import "core:mem"
 
 OutputType :: enum {OdinCode, Binary}
 
-
 main :: proc() {
 	// TODO: maciej - step through this. How does it even work??
 	Options :: struct {
@@ -49,7 +48,7 @@ main :: proc() {
     	}
     	fmt.fprintfln(
     		opts.output_file,
-    		"line_glyph :: struct {{\n\tadvance: i8,\n\tcoords_count: i8,\n\tcoords: [%d]i8\n}}",
+    		"line_glyph :: struct {{\n\tadvance: i8,\n\tcoords_count: i16,\n\tcoords: [%d]i8\n}}",
     		2 * max_coords_count,
     	)
     	fmt.fprintf(opts.output_file, "\ncursive_jhf_font:: [%d]line_glyph{{\n", len(hershey_glyphs))
@@ -89,7 +88,7 @@ main :: proc() {
 		// Calculate the total size required for the binary file
 		// Info: glyph count (4 bytes) + offsets (4 bytes per glyph)
 		// Data: For each glyph: advance (1 byte) + coords_count (1 byte) + coords (coords_count * 2 bytes)
-		glyph_count :i32= cast(i32)len(hershey_glyphs)
+		glyph_count :i32 = cast(i32)len(hershey_glyphs)
 		info_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
 
 		// Calculate offsets and total size

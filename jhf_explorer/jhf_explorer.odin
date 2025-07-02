@@ -9,6 +9,7 @@ import "core:strings"
 import rl "vendor:raylib"
 import utils "../common"
 
+binary_glyph_data :: #load("../jhf_files/rowmans.bin")
 ViewMode :: enum {GLYPH, TEXT}
 
 wrap_int :: proc(x, count: int) -> int {
@@ -26,9 +27,13 @@ draw_text :: proc (text: string,
 	origin := loc
 	newline_count := 1
 	for c in text {
-		newline_count += cast(int)utils.is_line_break(cast(u8)c)
+	    if utils.is_line_break(cast(u8)c) {
+		    newline_count += 1
+			origin.x = loc.x
+			origin.y = cast(f32)newline_count * scale * 32
+			continue
+	    }
 		cur_glyph_idx := cast(u8)c - 32
-		cur_glyph := glyphs[cur_glyph_idx]
 
 		glyph := glyphs[cur_glyph_idx]
 		px: i8 = utils.INVALID_COORD
@@ -44,14 +49,14 @@ draw_text :: proc (text: string,
 			px = cx
 			py = cy
 		}
-		origin.x += scale * cast(f32)cur_glyph.advance
+		origin.x += scale * cast(f32)glyph.advance
 	}
 	return cast(f32)newline_count * scale * 32
 }
 
 main :: proc() {
 	if len(os.args) != 2 {
-		fmt.eprintfln("Usage: %s <ply_filename>", filepath.stem(os.args[0]))
+		fmt.eprintfln("Usage: %s <jhf_filename>", filepath.stem(os.args[0]))
 		os.exit(1)
 	}
 	hershey_filepath := os.args[1]
@@ -62,8 +67,11 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	hershey_glyphs: [dynamic]utils.glyph_info = {}
-	utils.parse_jhf(jhf_data=data, glyphs = &hershey_glyphs)
+	// TODO(maciej): Figure out if you can return dynamic arrays
+	binary_glyphs :[dynamic]utils.glyph_info = {}
+	utils.read_binary_font(binary_glyph_data, &binary_glyphs)
+	jhf_glyphs: [dynamic]utils.glyph_info = {}
+	utils.parse_jhf(jhf_data=data, glyphs = &jhf_glyphs)
 
 	screen_width, screen_height: i32 = 1024, 1024
 	rl.SetTraceLogLevel(rl.TraceLogLevel.NONE)
@@ -87,14 +95,14 @@ main :: proc() {
 
 			// Iterate through parsed glyphs
 			if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) || rl.IsKeyPressed(rl.KeyboardKey.K) {
-				glyph_idx = wrap_int(glyph_idx + 1, len(hershey_glyphs))
+				glyph_idx = wrap_int(glyph_idx + 1, len(jhf_glyphs))
 			}
 			if rl.IsKeyPressed(rl.KeyboardKey.LEFT) || rl.IsKeyPressed(rl.KeyboardKey.J) {
-				glyph_idx = wrap_int(glyph_idx - 1, len(hershey_glyphs))
+				glyph_idx = wrap_int(glyph_idx - 1, len(jhf_glyphs))
 			}
 
 			// Draw glyph
-			glyph := hershey_glyphs[glyph_idx]
+			glyph := jhf_glyphs[glyph_idx]
 			px: i8 = utils.INVALID_COORD
 			py: i8 = utils.INVALID_COORD
 			for i: i16 = 0; i < glyph.coords_count; i += 1 {
@@ -114,12 +122,12 @@ main :: proc() {
 				"Glyph %c [%d out of %d]\nGlyph Idx.: %d\nCoordinate Count: %d\nWidth: %d",
 				glyph_idx + 32,
 				glyph_idx,
-				len(hershey_glyphs),
+				len(jhf_glyphs),
 				glyph.idx,
 				glyph.coords_count,
 				glyph.advance,
 			)
-			rl.DrawText(strings.unsafe_string_to_cstring(info_text), 10, 10, 25, rl.GRAY)
+			draw_text(info_text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2)
 
 			// Draw point grid
 			for r: f32 = -15; r <= 15; r += 1 {
@@ -152,21 +160,21 @@ main :: proc() {
 		} else {
 		    // Draw some text
 			text := "a quick brown fox jumps over a lazy dog"
-			y_offset := draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset := draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "A QUICK BROWN FOX JUMPS OVER A LAZY DOG"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "Sphinx of black quartz, judge my vow"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "0, 1, 2, 3, 4, 5, 6, 7, 8, 9"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "(2+2)*3=12"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "{email: lastname.firstname@mailbox.com}"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "All your bases are now belong to us"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 			text = "All work and no play makes Jack a dull boy"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &hershey_glyphs, size=14, width=2)
+			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
 		}
 
 		rl.EndDrawing()
