@@ -10,7 +10,7 @@ import rl "vendor:raylib"
 import utils "../common"
 
 // Load the font at compile time
-binary_glyph_data :: #load("../jhf_files/rowmans.bhf")
+binary_glyph_data :: #load("../font_files/rowmans.bhf")
 
 ViewMode :: enum {GLYPH, TEXT}
 
@@ -44,6 +44,7 @@ main :: proc() {
 	glyph_idx := 0
 	view_mode := ViewMode.GLYPH
 	text_size := 14
+	colorize_segments := false
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RAYWHITE)
@@ -57,11 +58,23 @@ main :: proc() {
 			scale: f32 = 1024 / 40
 
 			// Iterate through parsed glyphs
-			if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) || rl.IsKeyPressed(rl.KeyboardKey.K) {
+			if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) ||
+			   rl.IsKeyPressedRepeat(rl.KeyboardKey.RIGHT) ||
+			   rl.IsKeyPressed(rl.KeyboardKey.K) ||
+			   rl.IsKeyPressedRepeat(rl.KeyboardKey.K)  {
 				glyph_idx = utils.wrap_int(glyph_idx + 1, len(jhf_glyphs))
 			}
-			if rl.IsKeyPressed(rl.KeyboardKey.LEFT) || rl.IsKeyPressed(rl.KeyboardKey.J) {
+			if rl.IsKeyPressed(rl.KeyboardKey.LEFT) ||
+               rl.IsKeyPressedRepeat(rl.KeyboardKey.LEFT) ||
+               rl.IsKeyPressed(rl.KeyboardKey.J) ||
+               rl.IsKeyPressedRepeat(rl.KeyboardKey.J)
+			{
 				glyph_idx = utils.wrap_int(glyph_idx - 1, len(jhf_glyphs))
+			}
+
+			if rl.IsKeyPressed(rl.KeyboardKey.C) {
+    			colorize_segments = !colorize_segments
+
 			}
 
 			glyph := jhf_glyphs[glyph_idx]
@@ -76,9 +89,9 @@ main :: proc() {
 				glyph.advance,
 			)
 
-			utils.draw_text(info_text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2, color=rl.BLACK)
+			utils.draw_text(info_text, loc=rl.Vector2{20.0, 20.0}, glyphs = &binary_glyphs, size=14, width=2, color=rl.BLACK)
 			utils.draw_glyph_box(glyph=glyph, size_x=32, size_y=32, origin=origin, scale=scale, line_color=rl.RED, dot_color=rl.GRAY)
-			utils.draw_glyph(glyph=glyph, origin=origin, scale=scale, color=rl.BLACK)
+			utils.draw_glyph(glyph=glyph, origin=origin, scale=scale, colorize_segments=colorize_segments)
 
 
 		} else {
@@ -88,6 +101,7 @@ main :: proc() {
             if rl.IsKeyPressed(rl.KeyboardKey.MINUS) {
                 text_size -= 1
             }
+            // Draw text supports new lines as shown above, but this is showing how to draw it line by line
 			text := "a quick brown fox jumps over a lazy dog"
     		color := rl.BLACK
 			y_offset := utils.draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)

@@ -84,9 +84,10 @@ main :: proc() {
     	fmt.fprintln(opts.output_file, "\n}")
     	utils.log_if_verbose(opts.verbose, "Done")
 	} else if opts.output_type == OutputType.Binary {
+	    // TODO(maciej): Move the binary output to utils
 	    utils.log_if_verbose(opts.verbose, "Writing binary output")
 		// Calculate the total size required for the binary file
-		// Info: glyph count (4 bytes) + offsets (4 bytes per glyph)
+		// Info: glyph count (4 bytes) + offsets (4 byteg per glyph)
 		// Data: For each glyph: advance (1 byte) + coords_count (1 byte) + coords (coords_count * 2 bytes)
 		glyph_count :i32 = cast(i32)len(hershey_glyphs)
 		info_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
