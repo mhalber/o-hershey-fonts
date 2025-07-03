@@ -26,6 +26,11 @@ is_line_break :: proc(c: u8) -> bool {
 	return false
 }
 
+wrap_int :: proc(x, count: int) -> int {
+	out := x % count
+	return out + count if out < 0 else out
+}
+
 // Logging helpers
 log_if_verbose :: proc(verbose: bool, args: ..any) {
 	if verbose do fmt.println(..args)

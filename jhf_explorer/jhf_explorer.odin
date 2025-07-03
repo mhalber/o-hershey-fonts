@@ -9,50 +9,10 @@ import "core:strings"
 import rl "vendor:raylib"
 import utils "../common"
 
-binary_glyph_data :: #load("../jhf_files/rowmans.bin")
+// Load the font at compile time
+binary_glyph_data :: #load("../jhf_files/rowmans.bhf")
+
 ViewMode :: enum {GLYPH, TEXT}
-
-wrap_int :: proc(x, count: int) -> int {
-	out := x % count
-	return out + count if out < 0 else out
-}
-
-draw_text :: proc (text: string,
-                   loc: rl.Vector2,
-                   glyphs: ^[dynamic]utils.glyph_info,
-                   size: int=18,
-                   width: f32 = 1.0) -> f32{
-    font_size_in_pixels := utils.get_font_pixel_size(size)
-	scale := cast(f32)font_size_in_pixels / 32.0
-	origin := loc
-	newline_count := 1
-	for c in text {
-	    if utils.is_line_break(cast(u8)c) {
-		    newline_count += 1
-			origin.x = loc.x
-			origin.y = cast(f32)newline_count * scale * 32
-			continue
-	    }
-		cur_glyph_idx := cast(u8)c - 32
-
-		glyph := glyphs[cur_glyph_idx]
-		px: i8 = utils.INVALID_COORD
-		py: i8 = utils.INVALID_COORD
-		for i: i16 = 0; i < glyph.coords_count; i += 1 {
-			cx := glyph.coords[i * 2]
-			cy := glyph.coords[i * 2 + 1]
-			if (px != utils.INVALID_COORD && cx != utils.INVALID_COORD) {
-				p0 := rl.Vector2{cast(f32)px, cast(f32)py}
-				p1 := rl.Vector2{cast(f32)cx, cast(f32)cy}
-				rl.DrawLineEx(origin + scale * p0, origin + scale * p1, width, rl.BLACK)
-			}
-			px = cx
-			py = cy
-		}
-		origin.x += scale * cast(f32)glyph.advance
-	}
-	return cast(f32)newline_count * scale * 32
-}
 
 main :: proc() {
 	if len(os.args) != 2 {
@@ -67,9 +27,11 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	// TODO(maciej): Figure out if you can return dynamic arrays
+	// Read the binary font
 	binary_glyphs :[dynamic]utils.glyph_info = {}
 	utils.read_binary_font(binary_glyph_data, &binary_glyphs)
+
+	// Read the font from jhf format
 	jhf_glyphs: [dynamic]utils.glyph_info = {}
 	utils.parse_jhf(jhf_data=data, glyphs = &jhf_glyphs)
 
@@ -77,10 +39,11 @@ main :: proc() {
 	rl.SetTraceLogLevel(rl.TraceLogLevel.NONE)
 	rl.InitWindow(screen_width, screen_height, "Hershey Font (jhf) Explorer")
 	defer rl.CloseWindow()
-	rl.SetTargetFPS(30)
+	rl.SetTargetFPS(60)
 
 	glyph_idx := 0
 	view_mode := ViewMode.GLYPH
+	text_size := 14
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RAYWHITE)
@@ -95,31 +58,16 @@ main :: proc() {
 
 			// Iterate through parsed glyphs
 			if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) || rl.IsKeyPressed(rl.KeyboardKey.K) {
-				glyph_idx = wrap_int(glyph_idx + 1, len(jhf_glyphs))
+				glyph_idx = utils.wrap_int(glyph_idx + 1, len(jhf_glyphs))
 			}
 			if rl.IsKeyPressed(rl.KeyboardKey.LEFT) || rl.IsKeyPressed(rl.KeyboardKey.J) {
-				glyph_idx = wrap_int(glyph_idx - 1, len(jhf_glyphs))
+				glyph_idx = utils.wrap_int(glyph_idx - 1, len(jhf_glyphs))
 			}
 
-			// Draw glyph
 			glyph := jhf_glyphs[glyph_idx]
-			px: i8 = utils.INVALID_COORD
-			py: i8 = utils.INVALID_COORD
-			for i: i16 = 0; i < glyph.coords_count; i += 1 {
-				cx := glyph.coords[i * 2]
-				cy := glyph.coords[i * 2 + 1]
-				if (px != utils.INVALID_COORD && cx != utils.INVALID_COORD) {
-					p0 := rl.Vector2{cast(f32)(px + glyph.left), cast(f32)(py + utils.BASELINE)}
-					p1 := rl.Vector2{cast(f32)(cx + glyph.left), cast(f32)(cy + utils.BASELINE)}
-					rl.DrawLineEx(origin + scale * p0, origin + scale * p1, 4.0, rl.BLACK)
-				}
-				px = cx
-				py = cy
-			}
 
-			// Draw info about current glyph
 			info_text := fmt.tprintf(
-				"Glyph %c [%d out of %d]\nGlyph Idx.: %d\nCoordinate Count: %d\nWidth: %d",
+				"Glyph \'%c\' [%d out of %d]\nGlyph Idx.: %d\nCoordinate Count: %d\nWidth: %d",
 				glyph_idx + 32,
 				glyph_idx,
 				len(jhf_glyphs),
@@ -127,54 +75,36 @@ main :: proc() {
 				glyph.coords_count,
 				glyph.advance,
 			)
-			draw_text(info_text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2)
 
-			// Draw point grid
-			for r: f32 = -15; r <= 15; r += 1 {
-				for c: f32 = -15; c <= 15; c += 1 {
-					rl.DrawCircleV(origin + scale * rl.Vector2{c, r}, 2.0, rl.GRAY)
-				}
-			}
-			// Draw bbox
-			bbox_a := rl.Vector2{-16, -16}
-			bbox_b := rl.Vector2{-16, 16}
-			bbox_c := rl.Vector2{16, 16}
-			bbox_d := rl.Vector2{16, -16}
-			rl.DrawLineEx(origin + scale * bbox_a, origin + scale * bbox_b, 1.0, rl.RED)
-			rl.DrawLineEx(origin + scale * bbox_b, origin + scale * bbox_c, 1.0, rl.RED)
-			rl.DrawLineEx(origin + scale * bbox_c, origin + scale * bbox_d, 1.0, rl.RED)
-			rl.DrawLineEx(origin + scale * bbox_d, origin + scale * bbox_a, 1.0, rl.RED)
+			utils.draw_text(info_text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2, color=rl.BLACK)
+			utils.draw_glyph_box(glyph=glyph, size_x=32, size_y=32, origin=origin, scale=scale, line_color=rl.RED, dot_color=rl.GRAY)
+			utils.draw_glyph(glyph=glyph, origin=origin, scale=scale, color=rl.BLACK)
 
-			// Draw baselines
-			baseline_a := rl.Vector2{-16, -utils.BASELINE}
-			baseline_b := rl.Vector2{16, -utils.BASELINE}
-			rl.DrawLineEx(origin + scale * baseline_a, origin + scale * baseline_b, 1.0, rl.MAROON)
 
-			// Draw left and right verticals
-			left_a := rl.Vector2{cast(f32)glyph.left, 16}
-			left_b := rl.Vector2{cast(f32)glyph.left, -16}
-			rl.DrawLineEx(origin + scale * left_a, origin + scale * left_b, 1.0, rl.MAROON)
-			right_a := rl.Vector2{cast(f32)glyph.right, 16}
-			right_b := rl.Vector2{cast(f32)glyph.right, -16}
-			rl.DrawLineEx(origin + scale * right_a, origin + scale * right_b, 1.0, rl.MAROON)
 		} else {
-		    // Draw some text
+    		if rl.IsKeyPressed(rl.KeyboardKey.EQUAL) {
+       			text_size += 1
+    		}
+            if rl.IsKeyPressed(rl.KeyboardKey.MINUS) {
+                text_size -= 1
+            }
 			text := "a quick brown fox jumps over a lazy dog"
-			y_offset := draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=14, width=2)
+    		color := rl.BLACK
+			y_offset := utils.draw_text(text, loc=rl.Vector2{20.0, 20.0}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "A QUICK BROWN FOX JUMPS OVER A LAZY DOG"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "Sphinx of black quartz, judge my vow"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "0, 1, 2, 3, 4, 5, 6, 7, 8, 9"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "(2+2)*3=12"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "{email: lastname.firstname@mailbox.com}"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "All your bases are now belong to us"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 			text = "All work and no play makes Jack a dull boy"
-			y_offset += draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=14, width=2)
+			y_offset += utils.draw_text(text, loc=rl.Vector2{20.0, 20.0 + y_offset}, glyphs = &jhf_glyphs, size=text_size, width=2, color=color)
 		}
 
 		rl.EndDrawing()
