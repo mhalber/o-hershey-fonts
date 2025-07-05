@@ -3,6 +3,7 @@ package common
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:slice"
 import rl "vendor:raylib"
 
 // Basic
@@ -26,14 +27,20 @@ is_line_break :: proc(c: u8) -> bool {
 	return false
 }
 
+// Logging helpers
+log_if_verbose :: proc(verbose: bool, args: ..any) {
+	if verbose do fmt.println(..args)
+}
+
+// Misc
 wrap_int :: proc(x, count: int) -> int {
 	out := x % count
 	return out + count if out < 0 else out
 }
 
-// Logging helpers
-log_if_verbose :: proc(verbose: bool, args: ..any) {
-	if verbose do fmt.println(..args)
+pack_u32 :: proc(bytes: []u8) -> u32 {
+    assert(len(bytes) == 4)
+    return u32(bytes[0]) | (u32(bytes[1]) << 8) | (u32(bytes[2]) << 16) | (u32(bytes[3]) << 24)
 }
 
 get_font_pixel_size :: proc(font_size_in_points: int) -> f32 {
@@ -42,10 +49,10 @@ get_font_pixel_size :: proc(font_size_in_points: int) -> f32 {
 }
 
 // Binary format
-
 read_binary_font_from_memory :: proc(data: []u8, glyphs: ^[dynamic]glyph_info) -> bool {
     // First 4 bytes - glyph count
 	glyph_count := mem.slice_data_cast([]i32, data[0:4])[0]
+	// glyph_count := slice.to_type(data[0:4], i32)
 	fmt.println(glyph_count)
 
 	if glyph_count <= 0 || len(data) < int(4 + 4 * glyph_count) {
@@ -59,11 +66,9 @@ read_binary_font_from_memory :: proc(data: []u8, glyphs: ^[dynamic]glyph_info) -
 
 	offset_data := data[4:(4 + 4*glyph_count)]
 	for i in 0..<glyph_count {
+	// TODO(maciej): Can I just transmute here??
 		offset_idx := i * 4
-		offsets[i] = u32(offset_data[offset_idx]) |
-		            (u32(offset_data[offset_idx+1]) << 8) |
-		            (u32(offset_data[offset_idx+2]) << 16) |
-		            (u32(offset_data[offset_idx+3]) << 24)
+		offsets[i] = pack_u32(offset_data[offset_idx:offset_idx+4])
 	}
 
 	// Parse each glyph
@@ -83,6 +88,7 @@ read_binary_font_from_memory :: proc(data: []u8, glyphs: ^[dynamic]glyph_info) -
 		glyph.left = -glyph.advance >> 1
 		glyph.right = glyph.advance >> 1 + glyph.advance % 2
 
+		fmt.println(i, glyph.coords_count)
 		for j: i16 = 0; j < glyph.coords_count; j += 1 {
 			coord_offset := offset + 3 + u32(j * 2)
 			if int(coord_offset) + 1 >= len(data) {
@@ -121,4 +127,48 @@ read_binary_font_from_file :: proc(filepath: string, glyphs: ^[dynamic]glyph_inf
 read_binary_font :: proc {
     read_binary_font_from_file,
     read_binary_font_from_memory,
+}
+
+write_binary_font :: proc (file: os.Handle, glyphs: [dynamic]glyph_info) {
+	// Calculate the total size required for the binary file
+	// Info - glyph count (4 bytes) + offsets (4 bytes per glyph)
+	// Data - For each glyph: advance (1 byte) + coords_count (2 bytes) + coords (coords_count * 2 bytes)
+	glyph_count :i32 = cast(i32)len(glyphs)
+	info_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
+
+	// Calculate offsets and total size
+	offsets := make([]u32, glyph_count)
+	current_offset := u32(info_size)
+	defer delete(offsets)
+
+	// Size for each glyph: advance (1) + coords_count (2) + coords (coords_count * 2)
+	for glyph, i in glyphs {
+		offsets[i] = current_offset
+		current_offset += u32(3 + glyph.coords_count * 2)
+	}
+
+	total_size := current_offset
+
+	// Write the header
+	// First 4 bytes: glyph count
+	os.write(file, mem.any_to_bytes(glyph_count))
+
+	// Write offsets (4 bytes each)
+	for offset, i in offsets {
+	    offset_bytes := mem.any_to_bytes(offset)
+		os.write(file, offset_bytes)
+	}
+
+	// Write the glyph data
+	for glyph in glyphs {
+		os.write(file, mem.any_to_bytes(glyph.advance))
+		os.write(file, mem.any_to_bytes(glyph.coords_count))
+
+		glyph_coords := glyph.coords
+		fmt.println(glyph.coords_count)
+		// Write coordinates (coords_count * 2 bytes)
+		for j in 0..<glyph.coords_count {
+			os.write(file, mem.slice_data_cast([]u8, glyph_coords[(2*j):(2*j+1)]))
+		}
+	}
 }

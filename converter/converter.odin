@@ -7,10 +7,9 @@ import "core:os"
 import "core:path/filepath"
 import "core:mem"
 
-OutputType :: enum {OdinCode, Binary}
+OutputType :: enum {Binary, OdinCode}
 
 main :: proc() {
-	// TODO: maciej - step through this. How does it even work??
 	Options :: struct {
 		input_font:  os.Handle `args:"pos=0,required,file=r" usage:"Input jhf file."`,
 		output_file: os.Handle `args:"pos=1,required,file=cw" usage:"Output file."`,
@@ -84,56 +83,8 @@ main :: proc() {
     	fmt.fprintln(opts.output_file, "\n}")
     	utils.log_if_verbose(opts.verbose, "Done")
 	} else if opts.output_type == OutputType.Binary {
-	    // TODO(maciej): Move the binary output to utils
 	    utils.log_if_verbose(opts.verbose, "Writing binary output")
-		// Calculate the total size required for the binary file
-		// Info: glyph count (4 bytes) + offsets (4 byteg per glyph)
-		// Data: For each glyph: advance (1 byte) + coords_count (1 byte) + coords (coords_count * 2 bytes)
-		glyph_count :i32 = cast(i32)len(hershey_glyphs)
-		info_size := 4 + 4 * glyph_count // 4 bytes for count + 4 bytes per glyph offset
-
-		// Calculate offsets and total size
-		offsets := make([]u32, glyph_count)
-		current_offset := u32(info_size)
-
-		for glyph, i in hershey_glyphs {
-			offsets[i] = current_offset
-			// Size for this glyph: advance (1) + coords_count (2) + coords (coords_count * 2)
-			current_offset += u32(3 + glyph.coords_count * 2)
-		}
-
-		total_size := current_offset
-
-		utils.log_if_verbose(opts.verbose, "Binary file structure:")
-		utils.log_if_verbose(opts.verbose, "Header size:", info_size, "bytes")
-		utils.log_if_verbose(opts.verbose, "Total file size:", total_size, "bytes")
-
-		// Write the header
-		// First 4 bytes: glyph count
-		os.write(opts.output_file, mem.any_to_bytes(glyph_count))
-
-		// Write offsets (4 bytes each)
-		for offset, i in offsets {
-		    offset_bytes := mem.any_to_bytes(offset)
-			fmt.println(i, offset, offset_bytes)
-			os.write(opts.output_file, offset_bytes)
-		}
-
-		// Write the glyph data
-		for glyph in hershey_glyphs {
-			// Write advance (1 byte)
-			advance_byte := [1]u8{u8(glyph.advance)}
-			os.write(opts.output_file, mem.any_to_bytes(glyph.advance))
-			// Write coords_count (2 byte)
-			os.write(opts.output_file, mem.any_to_bytes(glyph.coords_count))
-
-			// Write coordinates (coords_count * 2 bytes)
-			for j in 0..<glyph.coords_count {
-				coords := [2]u8{u8(glyph.coords[2 * j]), u8(glyph.coords[2 * j + 1])}
-				os.write(opts.output_file, coords[:])
-			}
-		}
-
-		fmt.println("Binary output completed successfully")
+		utils.write_binary_font(file = opts.output_file, glyphs = hershey_glyphs)
+		utils.log_if_verbose(opts.verbose, "Done")
 	}
 }
