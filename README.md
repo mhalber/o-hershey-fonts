@@ -21,7 +21,7 @@ The `font_files` folder contains some of the jhf files as [distributed by `solst
 ### Converter
 As the name suggests, it converts jhf to either text form (similar to Mikko Mononen's simple simplex or Daniel Holden's consolines), or to a new and shiny Binary Hershey Font (bhf) format! The idea is that you can then `#load` these binary files into Odin, decode the binary format, and be off to the races.
 
-The format is straightforward:
+The binary format is straightforward:
 ```
 # INFO SECTION
 glyph_count -> i32, 4 bytes
@@ -36,7 +36,18 @@ glyphs -> [glyph_count]
     - y -> i8, 1 byte
 ```
 
-`offsets` tells you how far to go into the file from the file start, and then each glyph is simply advance plus the `x`, `y` coords. The coordinates are expressed in such a way that the point at the left edge and baseline of the glyph is `(0, 0)`. This choice makes writing the function to lay out the glyphs to the screen trivial.
+`offsets` tells you how far to go into the file from the file start, and then each glyph is simply advance plus the `x`, `y` coords. The coordinates are expressed in such a way that the point at the left edge and baseline of the glyph is `(0, 0)`. This choice makes writing the function to lay out the glyphs to the screen trivial. `min(i8)` (`-128`) is used to indicate an end of a segment. Check out the `draw_text` in `common/utils.odin` for details.
+
+The idea behind the text format is that you can paste the resulting file into your odin project and you will
+get simple struct:
+```
+jhf_glyph :: struct {
+	advance: i8,
+	coords_count: i16,
+	coords: [<max_coords_per_font>]i8
+}
+```
+followed by an array that stores the actual info for each glyph.
 
 ### Explorer
 Explorer is a simple program to view how glyphs in each .jhf file look.
